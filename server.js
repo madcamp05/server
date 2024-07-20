@@ -3,6 +3,7 @@ const fs = require('fs');
 const express = require('express');
 const passport = require('passport');
 const session = require('express-session');
+const mysql = require('mysql2/promise');
 const { initializeDatabase } = require('./database/db'); // Adjust the path according to your project structure
 
 const app = express();
