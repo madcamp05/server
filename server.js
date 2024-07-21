@@ -6,7 +6,10 @@ const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
 dotenv.config();
+
+const { getUserByUsername, getUserById } = require('./database/model');
 
 const app = express();
 
@@ -18,6 +21,7 @@ app.use(bodyParser.json());
 
 // 세션 설정
 app.use(session({
+  secret: process.env.SESSION_SECRET || 'your_session_secret_key', // 환경 변수를 사용하거나 기본값 설정
   resave: false,
   saveUninitialized: false
 }));
@@ -25,6 +29,27 @@ app.use(session({
 // Passport 초기화
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Passport 로컬 전략 설정
+passport.use(new LocalStrategy(
+  async (username, password, done) => {
+    try {
+      const user = await getUserByUsername(username);
+      if (!user) {
+        return done(null, false, { message: 'Invalid username or password' });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.user_password);
+      if (!isMatch) {
+        return done(null, false, { message: 'Invalid username or password' });
+      }
+
+      return done(null, user);
+    } catch (error) {
+      return done(error);
+    }
+  }
+));
 
 // 세션에서 사용자 정보 직렬화
 passport.serializeUser((user, done) => {
