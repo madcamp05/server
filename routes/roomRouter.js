@@ -1,8 +1,18 @@
 const express = require('express');
-const { login } = require('../controllers/loginController');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const { login } = require('./routes/login');
 
-const router = express.Router();
+const app = express();
 
-router.post('/login', login);
+// CORS 설정
+app.use(cors());
 
-module.exports = router;
+app.use(bodyParser.json());
+
+app.post('/api/login', login);
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});

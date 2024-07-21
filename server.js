@@ -9,6 +9,9 @@ const { initializeDatabase } = require('./database/db'); // Adjust the path acco
 const app = express();
 const PORT = 3000;
 
+// CORS 설정
+app.use(cors());
+
 // // 세션 설정
 // app.use(session({
 //   resave: false,
@@ -29,6 +32,8 @@ initializeDatabase();
 // app.get('/', (req, res) => {
 //   res.send('<h1>Welcome to GitCat</h1><a href="/auth/github">Login with GitHub</a>');
 // });
+
+app.post('/login', login);
 
 // 서버 시작
 app.listen(PORT, () => {
