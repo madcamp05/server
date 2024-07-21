@@ -1,55 +1,67 @@
+require('dotenv').config();
+const fs = require('fs');
 const express = require('express');
+const passport = require('passport');
+const session = require('express-session');
+const mysql = require('mysql2/promise');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const session = require('express-session');
-const passport = require('passport');
-const LocalStrategy = require('passport-local').Strategy;
-const bcrypt = require('bcryptjs');
-const dotenv = require('dotenv');
-const jwt = require('jsonwebtoken');
-dotenv.config();
-
-const { getUserByUsername, getUserById } = require('./database/model');
+const { initializeDatabase } = require('./database/db'); // Adjust the path according to your project structure
+//const auth = require('./auth');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// CORS 설정
-app.use(cors());
-
-// Body parser 설정
 app.use(bodyParser.json());
+app.use(cors());
 
 // 세션 설정
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'your_session_secret_key', // 환경 변수를 사용하거나 기본값 설정
+  secret: process.env.SESSION_SECRET,
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: true,
 }));
 
-// Passport 초기화
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 라우트 설정
-app.post('/api/login', (req, res, next) => {
-  passport.authenticate('local', (err, user, info) => {
-    if (err) {
-      return next(err);
-    }
-    if (!user) {
-      return res.status(401).json({ message: 'Invalid username or password' });
-    }
-    req.logIn(user, (err) => {
-      if (err) {
-        return next(err);
-      }
-      const token = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-      return res.json({ token });
-    });
-  })(req, res, next);
+
+// 초기화 실행
+initializeDatabase();
+
+const db = mysql.createPool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  multipleStatements: true
 });
 
-const PORT = process.env.PORT || 3000;
+// -- test
+app.get('/api', async (req, res) => {
+  res.send("welcome")
+});
+
+// -- login
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const [rows] = await db.query('SELECT * FROM users WHERE user_name = ? AND user_password = ?', [username, password]);
+    if (rows.length > 0) {
+      const user = rows[0];
+      res.json({
+        user_id: user.user_id
+      });
+    } else {
+      res.status(401).json({ error: 'Invalid username or password' });
+    }
+  } catch (err) {
+    console.error('Error during login:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// 서버 시작
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server is running on http://localhost:${PORT}`);
 });
