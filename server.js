@@ -1,41 +1,72 @@
-require('dotenv').config();
-const fs = require('fs');
 const express = require('express');
-const passport = require('passport');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 const session = require('express-session');
-const mysql = require('mysql2/promise');
-const { initializeDatabase } = require('./database/db'); // Adjust the path according to your project structure
+const passport = require('passport');
+const LocalStrategy = require('passport-local').Strategy;
+const { getUserByUsername, getUserById } = require('./database/model');
+const bcrypt = require('bcryptjs');
+const { login } = require('./routes/login');
 
 const app = express();
-const PORT = 3000;
 
 // CORS 설정
 app.use(cors());
 
-// // 세션 설정
-// app.use(session({
-//   resave: false,
-//   saveUninitialized: true,
-// }));
+// Body parser 설정
+app.use(bodyParser.json());
 
+// 세션 설정
+app.use(session({
+  secret: 'your_secret_key',
+  resave: false,
+  saveUninitialized: false
+}));
+
+// Passport 초기화
 app.use(passport.initialize());
 app.use(passport.session());
 
-// 초기화 실행
-initializeDatabase();
+// Passport 로컬 전략 설정
+passport.use(new LocalStrategy(
+  async (username, password, done) => {
+    try {
+      const user = await getUserByUsername(username);
+      if (!user) {
+        return done(null, false, { message: 'Invalid username or password' });
+      }
+
+      const isMatch = await bcrypt.compare(password, user.user_password);
+      if (!isMatch) {
+        return done(null, false, { message: 'Invalid username or password' });
+      }
+
+      return done(null, user);
+    } catch (error) {
+      return done(error);
+    }
+  }
+));
+
+// 세션에서 사용자 정보 직렬화
+passport.serializeUser((user, done) => {
+  done(null, user.user_id);
+});
+
+// 세션에서 사용자 정보 역직렬화
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await getUserById(id);
+    done(null, user);
+  } catch (error) {
+    done(error);
+  }
+});
 
 // 라우트 설정
-// const gitcatRouter = require('./routes/gitcatRouter');
-// app.use('/gitcat', gitcatRouter); // Using repoRouter
+app.post('/api/login', login);
 
-// // 기본 라우트
-// app.get('/', (req, res) => {
-//   res.send('<h1>Welcome to GitCat</h1><a href="/auth/github">Login with GitHub</a>');
-// });
-
-app.post('/login', login);
-
-// 서버 시작
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
